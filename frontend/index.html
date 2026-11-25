@@ -1,0 +1,301 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>PLĐC Legal Agentic RAG — Trợ lý Pháp luật & Máy tính Pháp lý</title>
+  <link rel="stylesheet" href="/static/styles.css" />
+</head>
+<body>
+  <div class="app-shell">
+    <!-- Sidebar -->
+    <aside class="sidebar">
+      <div class="brand">
+        <div class="brand-icon">⚖️</div>
+        <div>
+          <h1>PLĐC Legal RAG</h1>
+          <p>Hybrid RAG + Tool Calling</p>
+        </div>
+      </div>
+
+      <!-- Knowledge Base Status -->
+      <section class="side-card">
+        <div class="card-header">
+          <span>Kho tri thức (Index)</span>
+          <span id="status-badge" class="badge badge-warn">Đang tải...</span>
+        </div>
+        <div class="stat-grid">
+          <div class="stat-box">
+            <div class="stat-val" id="stat-slides">-</div>
+            <div class="stat-lbl">Slide PPTX</div>
+          </div>
+          <div class="stat-box">
+            <div class="stat-val" id="stat-textbook">-</div>
+            <div class="stat-lbl">Chunk Giáo trình</div>
+          </div>
+        </div>
+        <div class="pill-row">
+          <span id="pill-bm25" class="pill">BM25: -</span>
+          <span id="pill-dense" class="pill">Dense Vec: -</span>
+        </div>
+        <div class="ocr-box">
+          <div class="ocr-row">
+            <span>OCR Giáo trình PDF</span>
+            <span id="ocr-label">0 / 248 trang</span>
+          </div>
+          <div class="progress-bar"><div id="ocr-progress-fill" class="progress-fill" style="width:0%"></div></div>
+          <button id="btn-run-ocr" class="btn-secondary btn-sm" style="width:100%;margin-top:8px;">
+            🚀 Chạy OCR PDF + Build Dense Index
+          </button>
+          <div id="job-status-msg" class="muted-small"></div>
+        </div>
+      </section>
+
+      <!-- API Key & Retrieval Config -->
+      <section class="side-card">
+        <div class="card-header"><span>Cấu hình Gemini & RAG</span></div>
+        <label class="field-label">Gemini API Key (tùy chọn nếu đã có trong .env)</label>
+        <input id="input-api-key" type="password" placeholder="AIza..." autocomplete="off" />
+
+        <label class="field-label" style="margin-top:10px;">Nguồn truy xuất</label>
+        <select id="select-source-filter">
+          <option value="all">Tất cả (Slide + Giáo trình)</option>
+          <option value="slide">Chỉ 6 bộ Slide PPTX</option>
+          <option value="textbook">Chỉ Giáo trình PDF</option>
+        </select>
+
+        <label class="field-label" style="margin-top:10px;">Chế độ Retrieval</label>
+        <select id="select-retrieval-mode">
+          <option value="hybrid">Hybrid (Dense + BM25 + RRF)</option>
+          <option value="bm25">Sparse BM25 (Từ khóa pháp lý)</option>
+          <option value="dense">Dense Vector (Ngữ nghĩa)</option>
+        </select>
+      </section>
+
+      <!-- Sample Questions -->
+      <section class="side-card">
+        <div class="card-header"><span>Câu hỏi mẫu (Demo)</span></div>
+        <div class="sample-list">
+          <button class="sample-btn" data-prompt="Vợ chồng bà Thủy và ông Tài có tài sản chung là 18 tỷ; ông Tài có con riêng là Nhân (16 tuổi). Trước khi chết, bà Thủy lập di chúc cho chị gái Loan hưởng toàn bộ di sản và truất quyền ông Tài. Hãy tính chia di sản cụ thể và nêu cơ sở pháp lý.">
+            📜 Chia thừa kế (Bà Thủy - Ông Tài 18 tỷ)
+          </button>
+          <button class="sample-btn" data-prompt="Bị cáo A đang chấp hành bản án 20 năm tù, đã chấp hành được 5 năm. Nay Tòa án xét xử thêm một tội khác mức án 15 năm tù. Hãy tính và so sánh hình phạt chung còn phải chấp hành trong 2 trường hợp: (1) tội phạm mới phát hiện là tội cũ phạm trước bản án 1 (K1 Điều 56) và (2) tội phạm mới thực hiện trong lúc đang chấp hành án (K2 Điều 56).">
+            ⚖️ Tổng hợp bản án Điều 56 (K1 vs K2)
+          </button>
+          <button class="sample-btn" data-prompt="Bị cáo phạm 2 tội: tội 1 bị phạt 2 năm tù, tội 2 bị phạt 3 năm cải tạo không giam giữ, trước đó đã bị tạm giam 6 tháng. Hãy tổng hợp hình phạt theo Điều 55 BLHS.">
+            🏛️ Tổng hợp hình phạt Điều 55 (Tù + CTKGG)
+          </button>
+          <button class="sample-btn" data-prompt="Tòa xử phạt 3 năm tù cho hưởng án treo thì thời gian thử thách là bao lâu? Nêu các trường hợp không được hưởng án treo theo slide.">
+            📋 Án treo & thời gian thử thách (Điều 65)
+          </button>
+          <button class="sample-btn" data-prompt="Người lao động làm việc được 40 tháng (trong đó 10 tháng đóng BHTN), lương bình quân 6 tháng cuối là 10 triệu đồng/tháng. Tính trợ cấp thôi việc theo Điều 46 BLLĐ 2019.">
+            💼 Tính trợ cấp thôi việc (Điều 46 BLLĐ)
+          </button>
+        </div>
+      </section>
+    </aside>
+
+    <!-- Main Content -->
+    <main class="main-area">
+      <header class="topbar">
+        <nav class="tabs">
+          <button class="tab active" data-tab="chat">💬 Chatbot Pháp luật</button>
+          <button class="tab" data-tab="calculators">🧮 Máy tính Pháp lý</button>
+          <button class="tab" data-tab="inspector">🔍 Kiểm tra Hybrid Retrieval</button>
+        </nav>
+        <div class="topbar-actions">
+          <button id="btn-clear-chat" class="btn-ghost">Xóa hội thoại</button>
+        </div>
+      </header>
+
+      <!-- TAB 1: CHATBOT -->
+      <section id="tab-chat" class="tab-panel active">
+        <div id="chat-messages" class="chat-messages">
+          <div class="msg msg-assistant">
+            <div class="msg-avatar">⚖️</div>
+            <div class="msg-body">
+              <div class="msg-content">
+                <p>Chào bạn! Mình là <strong>Trợ lý Pháp luật Đại cương (Agentic RAG)</strong>.</p>
+                <p>Mình có thể:</p>
+                <ul>
+                  <li>Tra cứu lý thuyết, điều luật từ <strong>6 bộ slide PPTX</strong> và <strong>Giáo trình PDF</strong> (Hybrid Search: BM25 + Dense Vector + RRF) kèm trích dẫn chính xác số slide/trang.</li>
+                  <li><strong>Tự động gọi công cụ Python</strong> để tính chính xác 100%: Chia thừa kế (BLDS 2015), Tổng hợp hình phạt nhiều tội / nhiều bản án (Điều 55, 56 BLHS), Án treo (Điều 65), Lương làm thêm giờ / Trợ cấp thôi việc / Thử việc (BLLĐ 2019).</li>
+                </ul>
+                <p>Mỗi câu trả lời đều kèm bảng <strong>RAG &amp; Tool Trace Inspector</strong> để bạn theo dõi quá trình truy xuất &amp; tính toán (rất tiện để demo phỏng vấn!).</p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <form id="chat-form" class="chat-input-bar">
+          <textarea id="chat-input" rows="2" placeholder="Nhập câu hỏi lý thuyết hoặc bài tập tình huống pháp luật (Enter để gửi, Shift+Enter xuống dòng)..."></textarea>
+          <button id="btn-send" type="submit" class="btn-primary">Gửi</button>
+        </form>
+      </section>
+
+      <!-- TAB 2: DIRECT LEGAL CALCULATORS -->
+      <section id="tab-calculators" class="tab-panel">
+        <div class="calc-subtabs">
+          <button class="subtab active" data-calc="inheritance">📜 Chia thừa kế (BLDS 2015)</button>
+          <button class="subtab" data-calc="criminal">⚖️ Tổng hợp hình phạt &amp; Án treo (BLHS)</button>
+          <button class="subtab" data-calc="labor">💼 Pháp luật Lao động (BLLĐ 2019)</button>
+        </div>
+
+        <!-- Inheritance Form -->
+        <div id="calc-inheritance" class="calc-pane active">
+          <div class="preset-bar">
+            <span>Bài tập mẫu từ Slide:</span>
+            <button type="button" class="btn-secondary btn-sm" id="preset-slide-219">Slide 219 (Bà Thủy - 18 tỷ)</button>
+            <button type="button" class="btn-secondary btn-sm" id="preset-slide-220">Slide 220 (Ông A - 240tr)</button>
+            <button type="button" class="btn-secondary btn-sm" id="preset-slide-229">Slide 229 (Di chúc 1/3 + PL 2/3)</button>
+          </div>
+          <div class="two-col">
+            <div class="panel-card">
+              <h3>1. Thông tin Di sản &amp; Di chúc</h3>
+              <div class="form-grid">
+                <div><label class="field-label">Tài sản chung vợ chồng</label><input id="inh-marital" type="number" step="any" value="18" /></div>
+                <div><label class="field-label">Tài sản riêng người chết</label><input id="inh-personal" type="number" step="any" value="0" /></div>
+                <div><label class="field-label">Nợ / Nghĩa vụ tài sản</label><input id="inh-debts" type="number" step="any" value="0" /></div>
+                <div><label class="field-label">Chi phí mai táng</label><input id="inh-funeral" type="number" step="any" value="0" /></div>
+                <div><label class="field-label">Đơn vị tiền tệ</label><input id="inh-unit" type="text" value="tỷ đồng" /></div>
+                <div class="checkbox-wrap"><label><input id="inh-has-will" type="checkbox" checked /> Có di chúc hợp pháp</label></div>
+              </div>
+
+              <label class="field-label" style="margin-top:12px;">Người hưởng theo di chúc (JSON)</label>
+              <textarea id="inh-will-json" class="code-area" rows="4">[{"name": "Bà Loan", "share_fraction": 1.0}]</textarea>
+
+              <label class="field-label" style="margin-top:12px;">Hàng thừa kế theo pháp luật (JSON)</label>
+              <textarea id="inh-heirs-json" class="code-area" rows="5">[{"name": "Ông Tài", "relation": "chồng", "disinherited_by_will": true}]</textarea>
+
+              <button id="btn-calc-inheritance" class="btn-primary" style="margin-top:12px;width:100%;">Tính chia thừa kế</button>
+            </div>
+            <div class="panel-card">
+              <h3>2. Kết quả phân chia &amp; Cơ sở pháp lý</h3>
+              <div id="inh-result" class="calc-output">Nhấn "Tính chia thừa kế" để xem kết quả chi tiết.</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Criminal Form -->
+        <div id="calc-criminal" class="calc-pane">
+          <div class="two-col">
+            <div class="panel-card">
+              <h3>Tổng hợp nhiều bản án (Điều 56 BLHS)</h3>
+              <div class="form-grid">
+                <div>
+                  <label class="field-label">Trường hợp (Slide 115)</label>
+                  <select id="crim-case-type">
+                    <option value="khoan_1_toi_cu">Khoản 1 — Tội CŨ (C: + rồi -)</option>
+                    <option value="khoan_2_toi_moi">Khoản 2 — Tội MỚI (M: - rồi +)</option>
+                  </select>
+                </div>
+                <div>
+                  <label class="field-label">Loại hình phạt BA1</label>
+                  <select id="crim-ba1-type">
+                    <option value="tu_co_thoi_han">Tù có thời hạn</option>
+                    <option value="cai_tao_khong_giam_giu">Cải tạo không giam giữ</option>
+                    <option value="tu_chung_than">Tù chung thân</option>
+                  </select>
+                </div>
+                <div><label class="field-label">Mức án BA1 (tháng)</label><input id="crim-ba1-months" type="number" value="240" /></div>
+                <div><label class="field-label">Đã chấp hành BA1 (tháng)</label><input id="crim-ba1-served" type="number" value="60" /></div>
+                <div>
+                  <label class="field-label">Loại hình phạt BA2</label>
+                  <select id="crim-ba2-type">
+                    <option value="tu_co_thoi_han">Tù có thời hạn</option>
+                    <option value="cai_tao_khong_giam_giu">Cải tạo không giam giữ</option>
+                    <option value="tu_chung_than">Tù chung thân</option>
+                    <option value="tu_hinh">Tử hình</option>
+                  </select>
+                </div>
+                <div><label class="field-label">Mức án BA2 (tháng)</label><input id="crim-ba2-months" type="number" value="180" /></div>
+              </div>
+              <button id="btn-calc-d56" class="btn-primary" style="margin-top:12px;width:100%;">Tính tổng hợp Điều 56</button>
+
+              <hr class="divider" />
+              <h3>Tổng hợp nhiều tội (Điều 55 BLHS)</h3>
+              <label class="field-label">Danh sách hình phạt chính (JSON)</label>
+              <textarea id="crim-d55-json" class="code-area" rows="4">[{"crime_name":"Tội 1","penalty_type":"tu_co_thoi_han","years":2},{"crime_name":"Tội 2","penalty_type":"cai_tao_khong_giam_giu","years":3}]</textarea>
+              <div class="form-grid" style="margin-top:8px;">
+                <div><label class="field-label">Tạm giam (tháng)</label><input id="crim-detention-months" type="number" value="6" /></div>
+                <div><label class="field-label">Tạm giam (ngày lẻ)</label><input id="crim-detention-days" type="number" value="0" /></div>
+              </div>
+              <button id="btn-calc-d55" class="btn-secondary" style="margin-top:10px;width:100%;">Tính tổng hợp Điều 55</button>
+            </div>
+
+            <div class="panel-card">
+              <h3>Kết quả Hình sự</h3>
+              <div id="crim-result" class="calc-output">Chọn chế độ Điều 55 hoặc Điều 56 để tính toán.</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Labor Form -->
+        <div id="calc-labor" class="calc-pane">
+          <div class="two-col">
+            <div class="panel-card">
+              <h3>Trợ cấp Thôi việc (Đ46) / Mất việc làm (Đ47)</h3>
+              <div class="form-grid">
+                <div>
+                  <label class="field-label">Loại trợ cấp</label>
+                  <select id="lab-allow-type">
+                    <option value="thoi_viec">Trợ cấp thôi việc (Điều 46)</option>
+                    <option value="mat_viec_lam">Trợ cấp mất việc làm (Điều 47)</option>
+                  </select>
+                </div>
+                <div><label class="field-label">Lương BQ 6 tháng (VNĐ)</label><input id="lab-avg-sal" type="number" value="10000000" /></div>
+                <div><label class="field-label">Tổng tháng làm việc</label><input id="lab-total-m" type="number" value="40" /></div>
+                <div><label class="field-label">Tháng đã đóng BHTN</label><input id="lab-bhtn-m" type="number" value="10" /></div>
+              </div>
+              <button id="btn-calc-sev" class="btn-primary" style="margin-top:10px;width:100%;">Tính trợ cấp</button>
+
+              <hr class="divider" />
+              <h3>Lương làm thêm giờ &amp; ban đêm (Điều 98)</h3>
+              <div class="form-grid">
+                <div><label class="field-label">Lương giờ thực trả (VNĐ)</label><input id="lab-wage" type="number" value="100000" /></div>
+                <div><label class="field-label">Số giờ làm thêm</label><input id="lab-hours" type="number" value="4" /></div>
+                <div>
+                  <label class="field-label">Loại ngày</label>
+                  <select id="lab-day-type">
+                    <option value="ngay_thuong">Ngày thường (150%)</option>
+                    <option value="ngay_nghi_hang_tuan">Ngày nghỉ hằng tuần (200%)</option>
+                    <option value="ngay_le_tet">Ngày lễ, Tết (300%)</option>
+                  </select>
+                </div>
+                <div class="checkbox-wrap"><label><input id="lab-night" type="checkbox" checked /> Làm thêm vào ban đêm</label></div>
+              </div>
+              <button id="btn-calc-ot" class="btn-secondary" style="margin-top:10px;width:100%;">Tính lương làm thêm</button>
+            </div>
+            <div class="panel-card">
+              <h3>Kết quả Lao động</h3>
+              <div id="lab-result" class="calc-output">Nhập thông số để tính theo BLLĐ 2019.</div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- TAB 3: HYBRID RETRIEVAL INSPECTOR -->
+      <section id="tab-inspector" class="tab-panel">
+        <div class="inspector-bar">
+          <input id="inspect-query" type="text" placeholder="Nhập câu truy vấn để so sánh Hybrid RRF vs BM25 vs Dense (VD: Điều 644 người thừa kế không phụ thuộc di chúc)..." />
+          <select id="inspect-mode" style="width:180px;">
+            <option value="hybrid">Hybrid (RRF)</option>
+            <option value="bm25">Chỉ BM25</option>
+            <option value="dense">Chỉ Dense</option>
+          </select>
+          <select id="inspect-source" style="width:160px;">
+            <option value="all">Tất cả nguồn</option>
+            <option value="slide">Chỉ Slide</option>
+            <option value="textbook">Chỉ Giáo trình</option>
+          </select>
+          <button id="btn-inspect-search" class="btn-primary">Truy xuất</button>
+        </div>
+        <div id="inspect-meta" class="inspect-meta"></div>
+        <div id="inspect-results" class="inspect-results"></div>
+      </section>
+    </main>
+  </div>
+
+  <script src="/static/app.js"></script>
+</body>
+</html>
